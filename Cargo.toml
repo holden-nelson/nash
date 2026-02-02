@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "nash-parser",
+    "nash-core",
+]
+resolver = "3"

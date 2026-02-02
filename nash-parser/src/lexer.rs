@@ -1,3 +1,4 @@
+#[derive(Debug)]
 enum LexerState {
     Normal,
     Escaped,
@@ -139,7 +140,10 @@ pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
         LexerState::DoubleLiteral | LexerState::SingleLiteral => {
             return Err(LexError::UnterminatedLiteral);
         }
-        _ => panic!("You should never be able to end this loop in an escaped state"),
+        _ => panic!(
+            "You should never be able to end this loop in an escaped state: {:?}",
+            current_lex_state
+        ),
     }
 
     Ok(tokens)
