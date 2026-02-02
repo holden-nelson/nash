@@ -1,0 +1,7 @@
+[package]
+name = "nash-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nash-parser = { path = "../nash-parser" }
