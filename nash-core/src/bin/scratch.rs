@@ -1,4 +1,3 @@
-use nash_core::command::{Clause, Command};
 use nash_core::interpret::{Executable, interpret};
 use nash_parser::{lexer, parser};
 use std::io::{self, Write};

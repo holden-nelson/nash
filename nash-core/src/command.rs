@@ -1,7 +1,7 @@
 use crate::interpret::Executable;
 use std::process::Command as StdCommand;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Command {
     pub argv: Vec<Clause>,
 }
@@ -15,7 +15,11 @@ pub enum Clause {
 
 #[derive(Debug)]
 pub enum ExecutionResult {
-    Success { out: String, err: String, code: i32 },
+    Success {
+        out: Vec<u8>,
+        err: Vec<u8>,
+        code: i32,
+    },
     Error(String),
 }
 
@@ -26,26 +30,45 @@ impl Command {
 
     pub fn execute(self) -> ExecutionResult {
         if self.argv.is_empty() {
-            return ExecutionResult::Error("No command specified".to_string());
+            return ExecutionResult::Success {
+                out: vec![],
+                err: vec![],
+                code: 0,
+            };
         }
 
-        let mut argv = self.argv.into_iter();
-        let first = match argv.next() {
-            Some(c) => c,
-            None => return ExecutionResult::Error("No command specified".to_string()),
-        };
+        let mut argv = self.argv;
+        let first = argv.remove(0);
 
         let program = match first {
             Clause::Bare(s) | Clause::Literal(s) => s,
             Clause::Embedded(e) => match e {
                 Executable::Command { command } => match command.execute() {
-                    ExecutionResult::Success { out, .. } => out.trim().to_string(),
+                    ExecutionResult::Success { out, .. } => {
+                        // Convert bytes to string
+                        let output_str = String::from_utf8_lossy(&out);
+                        let words: Vec<&str> = output_str.split_whitespace().collect();
+
+                        if words.is_empty() {
+                            return ExecutionResult::Error("No command specified".to_string());
+                        }
+
+                        // Splice remaining words as arguments
+                        argv.splice(
+                            0..0,
+                            words[1..].iter().map(|&s| Clause::Literal(s.to_string())),
+                        );
+
+                        words[0].to_string()
+                    }
                     ExecutionResult::Error(err) => {
                         return ExecutionResult::Error(format!("Embedded command failed: {}", err));
                     }
                 },
             },
         };
+
+        dbg!(&program, &argv);
 
         let mut cmd = StdCommand::new(&program);
 
@@ -57,8 +80,10 @@ impl Command {
                 Clause::Embedded(exec) => match exec {
                     Executable::Command { command } => match command.execute() {
                         ExecutionResult::Success { out, .. } => {
-                            for line in out.lines() {
-                                cmd.arg(line);
+                            // Convert bytes to string and split by lines
+                            let output_str = String::from_utf8_lossy(&out);
+                            for line in output_str.lines() {
+                                cmd.arg(line.trim());
                             }
                         }
                         ExecutionResult::Error(e) => {
@@ -73,13 +98,11 @@ impl Command {
         }
 
         match cmd.output() {
-            Ok(output) => {
-                let out = String::from_utf8_lossy(&output.stdout).to_string();
-                let err = String::from_utf8_lossy(&output.stderr).to_string();
-                let code = output.status.code().unwrap_or(-1);
-
-                ExecutionResult::Success { out, err, code }
-            }
+            Ok(output) => ExecutionResult::Success {
+                out: output.stdout,
+                err: output.stderr,
+                code: output.status.code().unwrap_or(-1),
+            },
             Err(e) => ExecutionResult::Error(format!("Failed to execute command: {}", e)),
         }
     }
@@ -94,8 +117,12 @@ mod tests {
         let cmd = Command::new();
         let result = cmd.execute();
         match result {
-            ExecutionResult::Error(msg) => assert_eq!(msg, "No command specified"),
-            _ => panic!("Expected error for empty command"),
+            ExecutionResult::Success { out, code, err } => {
+                assert_eq!(out, Vec::<u8>::new());
+                assert_eq!(err, Vec::<u8>::new());
+                assert_eq!(code, 0);
+            }
+            _ => panic!("Expected success for empty command"),
         }
     }
 
@@ -108,7 +135,8 @@ mod tests {
         let result = cmd.execute();
         match result {
             ExecutionResult::Success { out, code, .. } => {
-                assert!(out.contains("hello"));
+                let output = String::from_utf8_lossy(&out);
+                assert!(output.contains("hello"));
                 assert_eq!(code, 0);
             }
             _ => panic!("Expected successful execution"),
@@ -124,7 +152,8 @@ mod tests {
         let result = cmd.execute();
         match result {
             ExecutionResult::Success { out, code, .. } => {
-                assert!(out.contains("test"));
+                let output = String::from_utf8_lossy(&out);
+                assert!(output.contains("test"));
                 assert_eq!(code, 0);
             }
             _ => panic!("Expected successful execution"),
@@ -155,9 +184,10 @@ mod tests {
         let result = cmd.execute();
         match result {
             ExecutionResult::Success { out, .. } => {
-                assert!(out.contains("one"));
-                assert!(out.contains("two"));
-                assert!(out.contains("three"));
+                let output = String::from_utf8_lossy(&out);
+                assert!(output.contains("one"));
+                assert!(output.contains("two"));
+                assert!(output.contains("three"));
             }
             _ => panic!("Expected successful execution"),
         }

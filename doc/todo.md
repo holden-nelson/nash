@@ -1,9 +1,11 @@
 - [x] implement lexer
 - [x] implement parser
 - [x] implement interpreter for command
-- [ ] more defensive programming
+- [x] more defensive programming
   - empty lists
   - consider and handle multiline output
-  - error handling
   - derive Default on Command
   - do we actually want `String::from_utf8_lossy`
+- [ ] line editor
+- [ ] autocomplete
+- [ ] nice error messages
