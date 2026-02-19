@@ -2,5 +2,6 @@
 members = [
     "nash-parser",
     "nash-core",
+     "nash-line",
 ]
 resolver = "3"
