@@ -1,3 +1,5 @@
+use std::fmt::{self};
+
 #[derive(Debug)]
 pub struct Buffer {
     left: Vec<char>,
@@ -60,18 +62,43 @@ impl Buffer {
         self.left.len()
     }
 
-    pub fn print(&self) -> String {
-        let mut output = String::new();
+    pub fn as_display(&self) -> BufferDisplay<'_> {
+        BufferDisplay(self)
+    }
 
-        for c in &self.left {
-            output.push(*c);
-        }
+    pub fn clear(&mut self) {
+        self.left.clear();
+        self.right.clear();
+    }
 
-        for c in self.right.iter().rev() {
-            output.push(*c);
-        }
+    pub fn take_string(&mut self) -> String {
+        let s = self
+            .left
+            .iter()
+            .chain(self.right.iter().rev())
+            .copied()
+            .collect();
 
-        output
+        self.clear();
+
+        s
+    }
+}
+
+pub struct BufferDisplay<'a>(&'a Buffer);
+
+impl fmt::Display for BufferDisplay<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use std::fmt::Write as _;
+
+        self.0
+            .left
+            .iter()
+            .chain(self.0.right.iter().rev())
+            .copied()
+            .try_for_each(|c| f.write_char(c))?;
+
+        Ok(())
     }
 }
 
@@ -89,7 +116,7 @@ mod tests {
     fn test_insert() {
         let mut buffer = Buffer::new();
         buffer.insert('a');
-        assert_eq!(buffer.print(), "a");
+        assert_eq!(buffer.as_display().to_string(), "a");
     }
 
     #[test]
@@ -97,16 +124,18 @@ mod tests {
         let mut buffer = Buffer::new();
         buffer.insert('a');
         buffer.backspace();
-        assert_eq!(buffer.print(), "");
+        assert_eq!(buffer.as_display().to_string(), "");
     }
 
     #[test]
     fn test_delete_forward() {
         let mut buffer = Buffer::new();
         buffer.insert('a');
-        buffer.move_cursor_right();
-        buffer.delete_forward();
-        assert_eq!(buffer.print(), "a");
+        buffer.insert('b'); // "ab"
+        buffer.move_cursor_left(); // cursor between a|b (right contains 'b')
+        buffer.delete_forward(); // delete 'b'
+        assert_eq!(buffer.as_display().to_string(), "a");
+        assert_eq!(buffer.cursor_column(), 1);
     }
 
     #[test]
@@ -144,5 +173,114 @@ mod tests {
         buffer.insert('b');
         buffer.move_cursor_end();
         assert_eq!(buffer.cursor_column(), 2);
+    }
+
+    #[test]
+    fn test_clear_on_empty_buffer() {
+        let mut buffer = Buffer::new();
+        buffer.clear();
+        assert_eq!(buffer.cursor_column(), 0);
+        assert_eq!(buffer.as_display().to_string(), "");
+    }
+
+    #[test]
+    fn test_clear_empties_buffer() {
+        let mut buffer = Buffer::new();
+        buffer.insert('a');
+        buffer.insert('b');
+        buffer.insert('c');
+
+        assert_eq!(buffer.as_display().to_string(), "abc");
+
+        buffer.clear();
+
+        // buffer should be reset
+        assert_eq!(buffer.cursor_column(), 0);
+        assert_eq!(buffer.as_display().to_string(), "");
+    }
+
+    #[test]
+    fn test_clear_with_cursor_in_middle_clears_both_sides() {
+        let mut buffer = Buffer::new();
+        buffer.replace("abcd"); // left = a b c d
+        buffer.move_cursor_left(); // right = d
+        buffer.move_cursor_left(); // right = d c, left = a b
+
+        // Visible text should still be "abcd"
+        assert_eq!(buffer.as_display().to_string(), "abcd");
+
+        buffer.clear();
+
+        // buffer should be reset
+        assert_eq!(buffer.cursor_column(), 0);
+        assert_eq!(buffer.as_display().to_string(), "");
+    }
+
+    #[test]
+    fn test_clear_can_be_called_twice() {
+        let mut buffer = Buffer::new();
+        buffer.replace("hi");
+
+        buffer.clear();
+        buffer.clear();
+
+        assert_eq!(buffer.cursor_column(), 0);
+        assert_eq!(buffer.as_display().to_string(), "");
+    }
+
+    #[test]
+    fn test_clear_after_edits() {
+        let mut buffer = Buffer::new();
+        buffer.replace("ab");
+        buffer.insert('c'); // "abc"
+        buffer.move_cursor_left(); // cursor between b and c
+        buffer.backspace(); // removes 'b' => "ac"
+        buffer.delete_forward(); // deletes 'c' (to the right) => "a"
+
+        assert_eq!(buffer.as_display().to_string(), "a");
+
+        buffer.clear();
+        assert_eq!(buffer.as_display().to_string(), "");
+        assert_eq!(buffer.cursor_column(), 0);
+    }
+
+    #[test]
+    fn test_take_string_on_empty_buffer() {
+        let mut buffer = Buffer::new();
+        assert_eq!(buffer.take_string(), "");
+        assert_eq!(buffer.as_display().to_string(), "");
+        assert_eq!(buffer.cursor_column(), 0);
+    }
+
+    #[test]
+    fn test_take_string_returns_contents_and_clears_buffer() {
+        let mut buffer = Buffer::new();
+        buffer.replace("hello");
+        assert_eq!(buffer.take_string(), "hello");
+        assert_eq!(buffer.as_display().to_string(), "");
+        assert_eq!(buffer.cursor_column(), 0);
+    }
+
+    #[test]
+    fn test_take_string_with_cursor_in_middle_returns_full_visible_text() {
+        let mut buffer = Buffer::new();
+        buffer.replace("abcd");
+        buffer.move_cursor_left();
+        buffer.move_cursor_left(); // cursor between b|c
+        assert_eq!(buffer.as_display().to_string(), "abcd");
+
+        assert_eq!(buffer.take_string(), "abcd");
+        assert_eq!(buffer.as_display().to_string(), "");
+        assert_eq!(buffer.cursor_column(), 0);
+    }
+
+    #[test]
+    fn test_take_string_can_be_called_twice() {
+        let mut buffer = Buffer::new();
+        buffer.replace("hi");
+
+        assert_eq!(buffer.take_string(), "hi");
+        assert_eq!(buffer.take_string(), "");
+        assert_eq!(buffer.cursor_column(), 0);
     }
 }

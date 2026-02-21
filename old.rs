@@ -121,6 +121,3 @@ impl Editor {
             .unwrap();
     }
 }
-
-#[cfg(test)]
-mod tests;
