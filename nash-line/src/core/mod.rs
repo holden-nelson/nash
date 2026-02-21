@@ -3,8 +3,6 @@
 //! Manages the input buffer and how incoming
 //! editor events mutate it
 
-use std::io;
-
 use crate::buffer::{Buffer, BufferDisplay};
 use EditorEvent::*;
 

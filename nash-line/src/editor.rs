@@ -4,8 +4,8 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 
 use crate::{
     core::{EditorCore, Step},
-    events::EventSource,
-    renderer::Renderer,
+    events::{EventSource, TerminalEventSource},
+    renderer::{Renderer, TerminalRenderer},
 };
 
 pub struct Editor<E: EventSource, R: Renderer> {
@@ -43,6 +43,18 @@ impl<E: EventSource, R: Renderer> Editor<E, R> {
                     return Ok(Signal::Aborted);
                 }
             }
+        }
+    }
+}
+
+pub type NashEditor = Editor<TerminalEventSource, TerminalRenderer<io::Stdout>>;
+
+impl Default for Editor<TerminalEventSource, TerminalRenderer<io::Stdout>> {
+    fn default() -> Self {
+        Editor {
+            core: EditorCore::new(),
+            events: TerminalEventSource,
+            renderer: TerminalRenderer::new(io::stdout()),
         }
     }
 }

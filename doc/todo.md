@@ -6,6 +6,6 @@
   - consider and handle multiline output
   - derive Default on Command
   - do we actually want `String::from_utf8_lossy`
-- [ ] line editor
+- [x] line editor
 - [ ] autocomplete
 - [ ] nice error messages

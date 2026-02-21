@@ -1,3 +1,7 @@
+use nash_line::editor::NashEditor;
+
 fn main() {
-    todo!("make scratch")
+    let mut ed: NashEditor = Default::default();
+
+    ed.read_line().unwrap();
 }
