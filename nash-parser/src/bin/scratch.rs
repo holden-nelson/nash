@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use nash_parser::{lexer, parser};
+use nash_parser::parser;
 
 fn main() -> io::Result<()> {
     print!("input> ");
@@ -9,17 +9,7 @@ fn main() -> io::Result<()> {
     let mut line = String::new();
     io::stdin().read_line(&mut line)?;
 
-    let tokens = match lexer::lex(&line) {
-        Ok(tokens) => tokens,
-        Err(e) => {
-            eprintln!("lex error: {e:?}");
-            return Ok(());
-        }
-    };
-
-    println!("tokens:\n{tokens:#?}");
-
-    let exprs = match parser::parse(tokens) {
+    let exprs = match parser::parse(&line) {
         Ok(exprs) => exprs,
         Err(e) => {
             eprintln!("parse error: {e:?}");

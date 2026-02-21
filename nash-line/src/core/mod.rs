@@ -43,10 +43,7 @@ impl EditorCore {
             Char(c) => self.buffer.insert(c),
             Backspace => self.buffer.backspace(),
             Delete => self.buffer.delete_forward(),
-            Enter => {
-                self.buffer.insert('\n');
-                return Step::Completed;
-            }
+            Enter => return Step::Completed,
             Tab => {
                 todo!()
             }

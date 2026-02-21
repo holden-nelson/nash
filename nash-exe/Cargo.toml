@@ -1,8 +1,9 @@
 [package]
-name = "nash-core"
+name = "nash-exe"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+nash-core = { path = "../nash-core" }
 nash-parser = { path = "../nash-parser" }
-thiserror = "2"
+nash-line = { path = "../nash-line" }

@@ -1,3 +1,5 @@
+use thiserror::Error;
+
 use crate::lexer;
 
 #[derive(Debug)]
@@ -12,16 +14,28 @@ pub enum Atom {
     Symbol(String),
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ParseError {
-    ExpectedAtom { got: lexer::Token },
+    #[error("lex error: {0}")]
+    LexError(#[from] crate::lexer::LexError),
+
+    #[error("expected atom, got: {got:?}")]
+    ExpectedAtom { got: crate::lexer::Token },
+
+    #[error("expected expression")]
     ExpectedExpression,
+
+    #[error("expected ')'")]
     ExpectedClosed,
+
+    #[error("unexpected ')'")]
     UnexpectedClosed,
 }
 
-pub fn parse(input: Vec<lexer::Token>) -> Result<Vec<Expression>, ParseError> {
-    let mut rest: &[lexer::Token] = &input;
+pub fn parse(input: &str) -> Result<Vec<Expression>, ParseError> {
+    let tokens = lexer::lex(input)?;
+
+    let mut rest: &[lexer::Token] = &tokens;
     let mut expressions = Vec::new();
 
     while !rest.is_empty() {

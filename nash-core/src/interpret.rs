@@ -1,22 +1,18 @@
-use crate::command::{Clause, Command};
 use nash_parser::parser::{Atom, Expression};
+use thiserror::Error;
 
-#[derive(Debug)]
-pub enum Executable {
-    Command { command: Command },
-    // coming soon
-    // Pipeline
-    // Binding
-    // Logical operators
-    // ...
-}
+use crate::runner::{
+    Runnable,
+    executable::{Clause, Executable},
+};
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum InterpretError {
+    #[error("expression expected at top level")]
     TopLevelAtom,
 }
 
-pub fn interpret(expressions: Vec<Expression>) -> Result<Vec<Executable>, InterpretError> {
+pub fn interpret(expressions: Vec<Expression>) -> Result<Vec<Runnable>, InterpretError> {
     let mut executables = vec![];
 
     for e in expressions {
@@ -29,7 +25,7 @@ pub fn interpret(expressions: Vec<Expression>) -> Result<Vec<Executable>, Interp
     Ok(executables)
 }
 
-pub fn interpret_list(expressions: Vec<Expression>) -> Result<Executable, InterpretError> {
+pub fn interpret_list(expressions: Vec<Expression>) -> Result<Runnable, InterpretError> {
     let operator = expressions.first();
 
     match operator {
@@ -37,7 +33,7 @@ pub fn interpret_list(expressions: Vec<Expression>) -> Result<Executable, Interp
     }
 }
 
-pub fn interpret_command(expressions: Vec<Expression>) -> Result<Executable, InterpretError> {
+pub fn interpret_command(expressions: Vec<Expression>) -> Result<Runnable, InterpretError> {
     let mut argv = vec![];
 
     for e in expressions {
@@ -53,8 +49,8 @@ pub fn interpret_command(expressions: Vec<Expression>) -> Result<Executable, Int
         }
     }
 
-    Ok(Executable::Command {
-        command: Command { argv },
+    Ok(Runnable::Command {
+        command: Executable { argv },
     })
 }
 
@@ -74,7 +70,7 @@ mod tests {
         assert_eq!(result.len(), 1);
 
         match &result[0] {
-            Executable::Command { command } => {
+            Runnable::Command { command } => {
                 assert_eq!(command.argv.len(), 2);
                 match &command.argv[0] {
                     Clause::Bare(s) => assert_eq!(s, "ls"),
@@ -99,7 +95,7 @@ mod tests {
         assert_eq!(result.len(), 1);
 
         match &result[0] {
-            Executable::Command { command } => {
+            Runnable::Command { command } => {
                 assert_eq!(command.argv.len(), 2);
                 match &command.argv[1] {
                     Clause::Literal(s) => assert_eq!(s, "hello world"),
@@ -124,11 +120,11 @@ mod tests {
         assert_eq!(result.len(), 1);
 
         match &result[0] {
-            Executable::Command { command } => {
+            Runnable::Command { command } => {
                 assert_eq!(command.argv.len(), 3);
                 match &command.argv[2] {
                     Clause::Embedded(exec) => match exec {
-                        Executable::Command {
+                        Runnable::Command {
                             command: inner_command,
                         } => {
                             assert_eq!(inner_command.argv.len(), 2);
@@ -184,7 +180,7 @@ mod tests {
         assert_eq!(result.len(), 1);
 
         match &result[0] {
-            Executable::Command { command } => {
+            Runnable::Command { command } => {
                 assert_eq!(command.argv.len(), 2);
                 // Verify nested structure exists
                 match &command.argv[1] {

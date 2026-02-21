@@ -96,11 +96,11 @@ mod tests {
         assert_eq!(core.handle(Enter), Step::Completed);
 
         // newline should be part of buffer
-        assert_eq!(buf(&core), "hi\n");
+        assert_eq!(buf(&core), "hi");
 
         // take() returns contents and clears buffer
         let taken = core.take();
-        assert_eq!(taken, "hi\n");
+        assert_eq!(taken, "hi");
         assert_eq!(buf(&core), "");
     }
 
@@ -147,8 +147,8 @@ mod tests {
         core.handle(Char('e'));
         assert_eq!(core.handle(Enter), Step::Completed);
 
-        assert_eq!(buf(&core), "one\n");
-        assert_eq!(core.take(), "one\n");
+        assert_eq!(buf(&core), "one");
+        assert_eq!(core.take(), "one");
         assert_eq!(buf(&core), "");
 
         core.handle(Char('t'));
@@ -156,8 +156,8 @@ mod tests {
         core.handle(Char('o'));
         assert_eq!(core.handle(Enter), Step::Completed);
 
-        assert_eq!(buf(&core), "two\n");
-        assert_eq!(core.take(), "two\n");
+        assert_eq!(buf(&core), "two");
+        assert_eq!(core.take(), "two");
         assert_eq!(buf(&core), "");
     }
 }

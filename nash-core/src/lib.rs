@@ -1,2 +1,2 @@
-pub mod command;
-pub mod interpret;
+mod interpret;
+pub mod runner;

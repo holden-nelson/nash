@@ -1,3 +1,5 @@
+use thiserror::Error;
+
 #[derive(Debug)]
 enum LexerState {
     Normal,
@@ -17,8 +19,9 @@ pub enum Token {
     Closed,
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum LexError {
+    #[error("literal not terminated")]
     UnterminatedLiteral,
 }
 
