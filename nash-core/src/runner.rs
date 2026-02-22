@@ -1,6 +1,6 @@
 pub mod executable;
 
-use std::io;
+use std::io::{self, Write};
 
 use executable::Executable;
 use nash_parser::parser;
@@ -18,6 +18,33 @@ pub enum Runnable {
     // ...
 }
 
+#[derive(Clone)]
+pub enum RunKind {
+    Interactive,
+    Embedded,
+}
+
+#[derive(Clone)]
+pub struct RunContext {
+    pub kind: RunKind,
+}
+
+impl RunContext {
+    pub fn as_embedded(&self) -> Self {
+        let mut ctx = self.clone();
+        ctx.kind = RunKind::Embedded;
+        ctx
+    }
+}
+
+impl Default for RunContext {
+    fn default() -> Self {
+        Self {
+            kind: RunKind::Interactive,
+        }
+    }
+}
+
 pub struct SuccessfulRun {
     out: Vec<u8>,
     err: Vec<u8>,
@@ -26,8 +53,12 @@ pub struct SuccessfulRun {
 
 impl Runnable {
     pub fn run(self) -> io::Result<SuccessfulRun> {
+        self.run_in_context(RunContext::default())
+    }
+
+    pub fn run_in_context(self, ctx: RunContext) -> io::Result<SuccessfulRun> {
         match self {
-            Runnable::Command { command } => command.execute(),
+            Runnable::Command { command } => command.execute(ctx),
         }
     }
 }
@@ -48,7 +79,10 @@ pub fn run(input: &str) -> Result<(), RunnerError> {
     let parsed = parser::parse(input)?;
     let runnables = interpret(parsed)?;
     for runnable in runnables {
-        runnable.run()?;
+        let result = runnable.run()?;
+        io::stdout().write_all(&result.out)?;
+        io::stderr().write_all(&result.err)?;
+        io::stdout().flush()?;
     }
 
     Ok(())

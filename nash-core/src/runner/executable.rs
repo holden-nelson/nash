@@ -1,5 +1,8 @@
-use crate::runner::{Runnable, SuccessfulRun};
-use std::{io, process::Command as StdCommand};
+use crate::runner::{RunContext, RunKind, Runnable, SuccessfulRun};
+use std::{
+    io,
+    process::{Command as StdCommand, Stdio},
+};
 
 #[derive(Debug, Default)]
 pub struct Executable {
@@ -18,7 +21,7 @@ impl Executable {
         Executable { argv: vec![] }
     }
 
-    pub fn execute(self) -> io::Result<SuccessfulRun> {
+    pub fn execute(self, ctx: RunContext) -> io::Result<SuccessfulRun> {
         if self.argv.is_empty() {
             return Ok(SuccessfulRun {
                 out: vec![],
@@ -33,7 +36,7 @@ impl Executable {
         let program = match first {
             Clause::Bare(s) | Clause::Literal(s) => s,
             Clause::Embedded(runnable) => {
-                let result = runnable.run()?;
+                let result = runnable.run_in_context(ctx.as_embedded())?;
 
                 let output_str = String::from_utf8_lossy(&result.out);
                 let mut parts = output_str.split_whitespace();
@@ -57,7 +60,7 @@ impl Executable {
                     cmd.arg(s);
                 }
                 Clause::Embedded(runnable) => {
-                    let result = runnable.run()?;
+                    let result = runnable.run_in_context(ctx.as_embedded())?;
                     let output_str = String::from_utf8_lossy(&result.out);
                     for line in output_str.lines() {
                         cmd.arg(line.trim());
@@ -66,13 +69,29 @@ impl Executable {
             }
         }
 
-        let output = cmd.output()?;
+        match ctx.kind {
+            RunKind::Embedded => {
+                let output = cmd.output()?;
+                Ok(SuccessfulRun {
+                    out: output.stdout,
+                    err: output.stderr,
+                    code: output.status.code().unwrap_or(-1),
+                })
+            }
+            RunKind::Interactive => {
+                let status = cmd
+                    .stdin(Stdio::inherit())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .status()?;
 
-        Ok(SuccessfulRun {
-            out: output.stdout,
-            err: output.stderr,
-            code: output.status.code().unwrap_or(-1),
-        })
+                Ok(SuccessfulRun {
+                    out: vec![],
+                    err: vec![],
+                    code: status.code().unwrap_or(-1),
+                })
+            }
+        }
     }
 }
 
@@ -81,10 +100,16 @@ mod tests {
     use super::*;
     use std::io;
 
+    fn embedded_ctx() -> RunContext {
+        RunContext {
+            kind: RunKind::Embedded,
+        }
+    }
+
     #[test]
     fn test_execute_empty_command() {
         let cmd = Executable::new();
-        let result = cmd.execute();
+        let result = cmd.execute(embedded_ctx());
 
         let SuccessfulRun { out, err, code } = result.expect("Expected Ok for empty command");
         assert_eq!(out, Vec::<u8>::new());
@@ -98,7 +123,9 @@ mod tests {
         cmd.argv.push(Clause::Literal("echo".to_string()));
         cmd.argv.push(Clause::Literal("hello".to_string()));
 
-        let SuccessfulRun { out, code, .. } = cmd.execute().expect("Expected successful execution");
+        let SuccessfulRun { out, code, .. } = cmd
+            .execute(embedded_ctx())
+            .expect("Expected successful execution");
         let output = String::from_utf8_lossy(&out);
         assert!(output.contains("hello"));
         assert_eq!(code, 0);
@@ -110,7 +137,9 @@ mod tests {
         cmd.argv.push(Clause::Bare("echo".to_string()));
         cmd.argv.push(Clause::Bare("test".to_string()));
 
-        let SuccessfulRun { out, code, .. } = cmd.execute().expect("Expected successful execution");
+        let SuccessfulRun { out, code, .. } = cmd
+            .execute(embedded_ctx())
+            .expect("Expected successful execution");
         let output = String::from_utf8_lossy(&out);
         assert!(output.contains("test"));
         assert_eq!(code, 0);
@@ -122,7 +151,7 @@ mod tests {
         cmd.argv
             .push(Clause::Literal("nonexistent_command_xyz".to_string()));
 
-        let result = cmd.execute();
+        let result = cmd.execute(embedded_ctx());
         match result {
             Ok(_) => panic!("Expected error for nonexistent command"),
             Err(e) => {
@@ -140,7 +169,9 @@ mod tests {
         cmd.argv.push(Clause::Literal("two".to_string()));
         cmd.argv.push(Clause::Literal("three".to_string()));
 
-        let SuccessfulRun { out, .. } = cmd.execute().expect("Expected successful execution");
+        let SuccessfulRun { out, .. } = cmd
+            .execute(embedded_ctx())
+            .expect("Expected successful execution");
         let output = String::from_utf8_lossy(&out);
         assert!(output.contains("one"));
         assert!(output.contains("two"));
