@@ -1,3 +1,4 @@
+mod autocomplete;
 mod buffer;
 mod core;
 pub mod editor;
