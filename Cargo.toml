@@ -4,5 +4,6 @@ members = [
     "nash-core",
     "nash-line", 
     "nash-exe",
+    "trie-viz",
 ]
 resolver = "3"

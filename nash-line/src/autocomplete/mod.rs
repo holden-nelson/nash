@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 pub struct TrieNode {
-    children: HashMap<char, TrieNode>,
-    terminals: Vec<String>,
-    lcp_of_subtrie: Option<String>,
-    terminals_in_subtrie: usize,
+    pub children: HashMap<char, TrieNode>,
+    pub terminals: Vec<String>,
+    pub lcp_of_subtrie: Option<String>,
+    pub terminals_in_subtrie: usize,
 }
 
 impl TrieNode {
@@ -23,7 +23,7 @@ impl TrieNode {
 }
 
 pub struct Trie {
-    root_node: TrieNode,
+    pub root_node: TrieNode,
 }
 
 impl Trie {

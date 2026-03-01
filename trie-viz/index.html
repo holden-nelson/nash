@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trie Playground</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Cascadia Code', 'Fira Code', 'Menlo', 'Consolas', monospace;
+      font-size: 14px;
+      background: #0f1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #21262d;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e6edf3;
+    }
+
+    header span.emoji { font-size: 22px; }
+
+    #error {
+      display: none;
+      background: #3d1f1f;
+      border: 1px solid #6d2828;
+      border-radius: 8px;
+      padding: 16px 20px;
+      color: #f97583;
+      margin-bottom: 20px;
+    }
+
+    #tree {
+      padding-left: 4px;
+    }
+
+    /* ── Tree nodes ──────────────────────────────────────── */
+
+    details {
+      margin: 2px 0;
+    }
+
+    details[open] > summary::before { content: '▾ '; }
+    details:not([open]) > summary::before { content: '▸ '; }
+
+    summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      user-select: none;
+      line-height: 1.5;
+    }
+
+    summary::-webkit-details-marker { display: none; }
+
+    summary:hover { background: #161b22; }
+
+    /* Children indented with a subtle line */
+    details > .children {
+      margin-left: 18px;
+      padding-left: 12px;
+      border-left: 1px solid #21262d;
+    }
+
+    /* Leaf nodes (no children) rendered as a plain div */
+    .leaf {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 4px 6px 4px 22px;
+      border-radius: 6px;
+      line-height: 1.5;
+    }
+
+    /* ── Labels inside a node row ────────────────────────── */
+
+    .edge {
+      font-weight: 700;
+      color: #79c0ff;
+      font-size: 15px;
+      min-width: 1ch;
+    }
+
+    .edge.root {
+      color: #8b949e;
+      font-size: 13px;
+      font-weight: 400;
+      font-style: italic;
+    }
+
+    .badge-terminal {
+      background: #1c4a2a;
+      border: 1px solid #2ea043;
+      color: #56d364;
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 12px;
+    }
+
+    .lcp {
+      color: #d2a8ff;
+      font-size: 12px;
+    }
+
+    .lcp::before { content: 'lcp: "'; }
+    .lcp::after  { content: '"'; }
+
+    .count {
+      color: #8b949e;
+      font-size: 12px;
+    }
+
+    .count::before { content: '('; }
+    .count::after  { content: ')'; }
+
+    .no-data {
+      color: #8b949e;
+      font-style: italic;
+      margin-top: 40px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="emoji">🌳</span>
+    <h1>Trie Playground</h1>
+  </header>
+
+  <div id="error"></div>
+  <div id="tree"></div>
+
+  <script>
+    // ── Base64 (URL-safe, no-pad) decode ────────────────────────────────────
+    // atob only handles standard base64 (+/), so we normalise first.
+    function decodeBase64(str) {
+      const standard = str.replace(/-/g, '+').replace(/_/g, '/');
+      // Re-add padding
+      const padded = standard + '=='.slice(0, (4 - standard.length % 4) % 4);
+      return atob(padded);
+    }
+
+    // ── DOM helpers ─────────────────────────────────────────────────────────
+    function el(tag, attrs = {}, ...children) {
+      const e = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'className') e.className = v;
+        else e.setAttribute(k, v);
+      }
+      for (const child of children) {
+        if (child == null) continue;
+        e.append(typeof child === 'string' ? document.createTextNode(child) : child);
+      }
+      return e;
+    }
+
+    function span(cls, text) {
+      return el('span', { className: cls }, text);
+    }
+
+    // ── Build the label content shared by summary and leaf rows ─────────────
+    function buildNodeLabel(node) {
+      const parts = [];
+
+      // Edge character
+      if (node.edge == null) {
+        parts.push(span('edge root', '[root]'));
+      } else {
+        parts.push(span('edge', node.edge));
+      }
+
+      // Terminal badges — strings that end exactly here
+      for (const t of node.terminals) {
+        parts.push(span('badge-terminal', t));
+      }
+
+      // LCP of subtrie
+      if (node.lcp_of_subtrie != null) {
+        parts.push(span('lcp', node.lcp_of_subtrie));
+      }
+
+      // Subtrie count
+      if (node.terminals_in_subtrie > 0) {
+        parts.push(span('count', String(node.terminals_in_subtrie)));
+      }
+
+      return parts;
+    }
+
+    // ── Recursive renderer ──────────────────────────────────────────────────
+    function renderNode(node) {
+      const labelParts = buildNodeLabel(node);
+
+      if (node.children.length === 0) {
+        // Leaf — no expand arrow needed
+        const div = el('div', { className: 'leaf' }, ...labelParts);
+        return div;
+      }
+
+      // Branch — use <details> for collapsible behaviour
+      const summary = el('summary', {}, ...labelParts);
+      const childContainer = el('div', { className: 'children' });
+      for (const child of node.children) {
+        childContainer.append(renderNode(child));
+      }
+
+      const details = el('details', { open: '' }, summary, childContainer);
+      return details;
+    }
+
+    // ── Main ────────────────────────────────────────────────────────────────
+    function showError(msg) {
+      const errEl = document.getElementById('error');
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    }
+
+    function main() {
+      const hash = location.hash;
+
+      if (!hash || !hash.startsWith('#data=')) {
+        document.getElementById('tree').append(
+          el('p', { className: 'no-data' },
+            'No trie data found in URL. Call log_playground_url(&trie) in Rust to generate a link.')
+        );
+        return;
+      }
+
+      const encoded = hash.slice('#data='.length);
+
+      let json;
+      try {
+        json = decodeBase64(encoded);
+      } catch (e) {
+        showError('Failed to decode base64 from URL hash: ' + e.message);
+        return;
+      }
+
+      let root;
+      try {
+        root = JSON.parse(json);
+      } catch (e) {
+        showError('Failed to parse trie JSON: ' + e.message);
+        return;
+      }
+
+      document.getElementById('tree').append(renderNode(root));
+    }
+
+    document.addEventListener('DOMContentLoaded', main);
+  </script>
+</body>
+</html>
