@@ -1,18 +1,9 @@
-use nash_line::autocomplete::Trie;
+use nash_line::autocomplete::executable::ExecutableCompleter;
 
 fn main() {
-    let mut trie = Trie::new();
+    let completer = ExecutableCompleter::new().with_executables_in_path();
 
-    // A small set of words to demonstrate the trie structure.
-    // Edit these freely — then run `cargo run --bin scratch -p trie-viz`
-    // and open the URL that gets printed to stderr.
-    let words = [
-        "fooBar", "foobaz", "fooqUx", "cat", "cargo", "car", "card", "care",
-    ];
-
-    for word in words {
-        trie.insert(word);
-    }
+    let trie = completer.trie();
 
     trie_viz::log_playground_url(&trie);
 }

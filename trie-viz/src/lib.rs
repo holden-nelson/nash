@@ -1,6 +1,8 @@
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use nash_line::autocomplete::{Trie, TrieNode};
+use nash_line::autocomplete::trie::{Trie, TrieNode};
 use serde::Serialize;
+
+// Embed the HTML template at compile time so the binary is self-contained.
+const HTML_TEMPLATE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/index.html"));
 
 // ---------------------------------------------------------------------------
 // Snapshot types — a serialization-friendly mirror of the Trie internals.
@@ -13,8 +15,6 @@ struct TrieNodeSnapshot {
     edge: Option<char>,
     /// Original-cased strings that terminate exactly at this node.
     terminals: Vec<String>,
-    /// Longest common prefix of all strings reachable from this node.
-    lcp_of_subtrie: Option<String>,
     /// Total count of terminal strings in this subtrie.
     terminals_in_subtrie: usize,
     /// Children, sorted by edge char for deterministic output.
@@ -35,7 +35,6 @@ fn snapshot_node(node: &TrieNode, edge: Option<char>) -> TrieNodeSnapshot {
     TrieNodeSnapshot {
         edge,
         terminals: node.terminals.clone(),
-        lcp_of_subtrie: node.lcp_of_subtrie.clone(),
         terminals_in_subtrie: node.terminals_in_subtrie,
         children,
     }
@@ -45,8 +44,8 @@ fn snapshot_node(node: &TrieNode, edge: Option<char>) -> TrieNodeSnapshot {
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Serialise `trie` to JSON, base64-encode it, and print a `file://` URL to
-/// `stderr` that opens the co-located `index.html` playground page.
+/// Serialise `trie` to JSON, inject it into the HTML template, write to a
+/// temp file, and print a `file://` URL to `stderr`.
 ///
 /// Usage:
 /// ```rust,ignore
@@ -58,14 +57,18 @@ pub fn log_playground_url(trie: &Trie) {
     let json = serde_json::to_string(&snapshot)
         .expect("trie-viz: failed to serialize trie snapshot to JSON");
 
-    let encoded = URL_SAFE_NO_PAD.encode(json.as_bytes());
+    // Stamp the JSON directly into the template as a JS variable so we never
+    // hit any URL length limits — even for a full $PATH trie.
+    let html = HTML_TEMPLATE.replace(
+        "const __TRIE_DATA__ = null;",
+        &format!("const __TRIE_DATA__ = {};", json),
+    );
 
-    // CARGO_MANIFEST_DIR is resolved at compile time to the absolute path of
-    // the trie-viz crate directory, giving us a stable path to index.html.
-    let html_path = concat!(env!("CARGO_MANIFEST_DIR"), "/index.html");
+    let out_path = std::env::temp_dir().join("trie-viz.html");
+    std::fs::write(&out_path, html).expect("trie-viz: failed to write playground HTML to temp dir");
 
     eprintln!(
-        "\n🌳 Trie Playground — open in your browser:\n  file://{}#data={}\n",
-        html_path, encoded
+        "\n🌳 Trie Playground — open in your browser:\n  file://{}\n",
+        out_path.display()
     );
 }

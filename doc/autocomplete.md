@@ -24,15 +24,22 @@ Case-insensitive completions:
 pub struct TrieNode {
     children: HashMap<char, TrieNode>, // normalized edges
     terminals: Vec<String>,            // if this node ends any tokens
-    lcp_under: Option<String>,         // case-sensitive LCP of terminals below
-    count_under: usize,                // number of terminals below
+    terminals_in_subtrie: usize,       // number of terminals below
 }
 ```
 
-- As we insert executables, we calculate the lcp of the executable we're inserting and the existing prefix on that node and cache it on the node
-  - So we're walking the trie, inserting `fooBar`
-  - We make it to a node `f` -> `o`
-  - This node has `lcp_under` -> `Some("foobaz")`
-  - we replace with `lcp("foobaz", "fooBar")` -> `Some("foo")`
-    - not `Some("fooba")` cause differing casing of `b`
-  - we also increment `count_under` cause we know this thing is gonna terminate down there somewhere
+- As we insert executables, we increment the cached number of terminals in the subtrie so we know how many on a quick glance
+
+Completion behavior:
+
+- If there is no autocompletion or LCP for what the user has entered, ring bell
+- If there is exactly one autocompletion, complete it
+- If there is more than one autocompletion,
+  - and there are less than 37 autocompletions
+    - display autocompletions
+      - and let the user tab through them
+  - and there are more than 36 autocompletions
+    - ask if user wants to display
+      - if yes
+        - display them
+          - and let the user tab through them

@@ -116,14 +116,6 @@
       font-size: 12px;
     }
 
-    .lcp {
-      color: #d2a8ff;
-      font-size: 12px;
-    }
-
-    .lcp::before { content: 'lcp: "'; }
-    .lcp::after  { content: '"'; }
-
     .count {
       color: #8b949e;
       font-size: 12px;
@@ -150,14 +142,8 @@
   <div id="tree"></div>
 
   <script>
-    // ── Base64 (URL-safe, no-pad) decode ────────────────────────────────────
-    // atob only handles standard base64 (+/), so we normalise first.
-    function decodeBase64(str) {
-      const standard = str.replace(/-/g, '+').replace(/_/g, '/');
-      // Re-add padding
-      const padded = standard + '=='.slice(0, (4 - standard.length % 4) % 4);
-      return atob(padded);
-    }
+    // Injected by log_playground_url() at runtime — null means no data yet.
+    const __TRIE_DATA__ = null;
 
     // ── DOM helpers ─────────────────────────────────────────────────────────
     function el(tag, attrs = {}, ...children) {
@@ -191,11 +177,6 @@
       // Terminal badges — strings that end exactly here
       for (const t of node.terminals) {
         parts.push(span('badge-terminal', t));
-      }
-
-      // LCP of subtrie
-      if (node.lcp_of_subtrie != null) {
-        parts.push(span('lcp', node.lcp_of_subtrie));
       }
 
       // Subtrie count
@@ -235,35 +216,15 @@
     }
 
     function main() {
-      const hash = location.hash;
-
-      if (!hash || !hash.startsWith('#data=')) {
+      if (__TRIE_DATA__ === null) {
         document.getElementById('tree').append(
           el('p', { className: 'no-data' },
-            'No trie data found in URL. Call log_playground_url(&trie) in Rust to generate a link.')
+            'No trie data found. Call trie_viz::log_playground_url(&trie) in Rust to generate a file.')
         );
         return;
       }
 
-      const encoded = hash.slice('#data='.length);
-
-      let json;
-      try {
-        json = decodeBase64(encoded);
-      } catch (e) {
-        showError('Failed to decode base64 from URL hash: ' + e.message);
-        return;
-      }
-
-      let root;
-      try {
-        root = JSON.parse(json);
-      } catch (e) {
-        showError('Failed to parse trie JSON: ' + e.message);
-        return;
-      }
-
-      document.getElementById('tree').append(renderNode(root));
+      document.getElementById('tree').append(renderNode(__TRIE_DATA__));
     }
 
     document.addEventListener('DOMContentLoaded', main);
