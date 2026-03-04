@@ -83,6 +83,16 @@ impl Buffer {
 
         s
     }
+
+    pub fn take_until_highlighted(&self) -> String {
+        let right_until_whitespace = self.right.iter().rev().take_while(|&&c| !c.is_whitespace());
+
+        self.left
+            .iter()
+            .chain(right_until_whitespace)
+            .copied()
+            .collect()
+    }
 }
 
 pub struct BufferDisplay<'a>(&'a Buffer);

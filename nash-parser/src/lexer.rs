@@ -23,6 +23,9 @@ pub enum Token {
 pub enum LexError {
     #[error("literal not terminated")]
     UnterminatedLiteral,
+
+    #[error("trailing escape")]
+    OpenEscape,
 }
 
 pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
@@ -143,10 +146,11 @@ pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
         LexerState::DoubleLiteral | LexerState::SingleLiteral => {
             return Err(LexError::UnterminatedLiteral);
         }
-        _ => panic!(
-            "You should never be able to end this loop in an escaped state: {:?}",
-            current_lex_state
-        ),
+        LexerState::Escaped
+        | LexerState::DoubleLiteralEscaped
+        | LexerState::SingleLiteralEscaped => {
+            return Err(LexError::OpenEscape);
+        }
     }
 
     Ok(tokens)

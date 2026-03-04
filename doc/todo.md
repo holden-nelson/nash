@@ -9,3 +9,4 @@
 - [x] line editor
 - [ ] autocomplete
 - [ ] nice error messages
+- [ ] bash / zsh completion handlers
